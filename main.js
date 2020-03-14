@@ -4,8 +4,9 @@ var url = require('url');
 var qs = require('querystring');
 var template = require('./lib/template.js');
 var path = require('path');
+var sanitizeHtml = require('sanitize-html');  // html 태그 입출력 관련 보안 문제 해결하기 위한 모듈
 
-var app = http.createServer(function(request,response){  // localhost를 통해 동작시킬 app
+var app = http.createServer(function(request,response){  // function : 서버로의 호출 있을 때 마다 실행될 콜백 메서드
     var _url = request.url;
     var queryData = url.parse(_url, true).query;  // queryString 정보
     var pathname = url.parse(_url, true).pathname;
@@ -28,13 +29,17 @@ var app = http.createServer(function(request,response){  // localhost를 통해 
           var filteredId = path.parse(queryData.id).base;  // 보안 유지 위한 경로 필터링
           fs.readFile(`data/${filteredId}`, 'utf8', function(err, description) {
             var title = queryData.id;
+            var sanitizedTitle = sanitizeHtml(title);  // 외부에서(로) 출입하는 데이터들은 필터링을 거치는 것이 좋다
+            var sanitizedDescription = sanitizeHtml(description, {
+              allowedTags:['h1']  // <h1>를 제외한 모든 태그들은 전부 필터링
+            });
             var list = template.list(filelist);
-            var html = template.HTML(title, list, 
-              `<h2>${title}</h2><p>${description}</p>`
+            var html = template.HTML(sanitizedTitle, list, 
+              `<h2>${sanitizedTitle}</h2><p>${sanitizedDescription}</p>`
               `<a href="/create">create</a>
-               <a href="/update?id=${title}">update</a>
+               <a href="/update?id=${sanitizedTitle}">update</a>
                <form action="/process_delete" method="post">
-                <input type="hidden" name="id" value="${title}">
+                <input type="hidden" name="id" value="${sanitizedTitle}">
                 <input type="submit" value="delete">
                <form>`
             );
