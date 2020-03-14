@@ -3,6 +3,7 @@ var fs = require('fs');
 var url = require('url');
 var qs = require('querystring');
 var template = require('./lib/template.js');
+var path = require('path');
 
 var app = http.createServer(function(request,response){  // localhost를 통해 동작시킬 app
     var _url = request.url;
@@ -24,7 +25,8 @@ var app = http.createServer(function(request,response){  // localhost를 통해 
         });
       } else {  // 목록 중 하나를 선택했을 때 활성화 되는 부분
         fs.readdir('./data', function(error, filelist) {
-          fs.readFile(`data/${queryData.id}`, 'utf8', function(err, description) {
+          var filteredId = path.parse(queryData.id).base;  // 보안 유지 위한 경로 필터링
+          fs.readFile(`data/${filteredId}`, 'utf8', function(err, description) {
             var title = queryData.id;
             var list = template.list(filelist);
             var html = template.HTML(title, list, 
@@ -76,7 +78,8 @@ var app = http.createServer(function(request,response){  // localhost를 통해 
       });
     } else if (pathname === '/update') {
       fs.readdir('./data', function(error, filelist) {
-        fs.readFile(`data/${queryData.id}`, 'utf8', function(err, description){
+        var filteredId = path.parse(queryData.id).base;  // 보안 유지 위한 경로 필터링
+        fs.readFile(`data/${filteredId}`, 'utf8', function(err, description){
           var title = queryData.id;
           var list = template.list(filelist);
           var html = template.HTML(title, list,
@@ -131,7 +134,8 @@ var app = http.createServer(function(request,response){  // localhost를 통해 
       request.on('end', function() {  // 더이상 들어올 데이터가 없을 때 실행되는 콜백 메서드.
         var post = qs.parse(body);
         var id = post.id;
-        fs.unlink(`data/${id}`, function(error) {  // 입력받은 경로의 파일 삭제
+        var filteredId = path.parse(id).base;  // 보안 유지 위한 경로 필터링
+        fs.unlink(`data/${filteredId}`, function(error) {  // 입력받은 경로의 파일 삭제
           response.writeHead(302, {Location : `/`});  // id값까지 수정해줘야함
           response.end();  // writeHead() 받은 Location으로의 이동은 여기서 이뤄진다
         });
