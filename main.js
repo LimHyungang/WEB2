@@ -3,31 +3,33 @@ var fs = require('fs');
 var url = require('url');
 var qs = require('querystring');
 
-function templateHTML(title, list, body, control) {
-  return `
-  <!doctype html>
-  <html>
-  <head>
-    <title>WEB1 - ${title}</title>
-    <meta charset="utf-8">
-  </head>
-  <body>
-    <h1><a href="/?id=WEB">WEB</a></h1>
-    ${list}
-    ${control}
-    ${body}
-  </body>
-  </html>
-  `;
-}
+var template = {
+  HTML : function(title, list, body, control) {
+    return `
+    <!doctype html>
+    <html>
+    <head>
+      <title>WEB1 - ${title}</title>
+      <meta charset="utf-8">
+    </head>
+    <body>
+      <h1><a href="/">WEB</a></h1>
+      ${list}
+      ${control}
+      ${body}
+    </body>
+    </html>
+    `;
+  },
 
-function templateList(filelist) {
-  var list = '<ul>';
-  for (var i = 0; i < filelist.length; i++) {
-    list = list + `<li><a href="/?id=${filelist[i]}">${filelist[i]}</a></li>`
+  list : function(filelist) {
+    var list = '<ul>';
+    for (var i = 0; i < filelist.length; i++) {
+      list = list + `<li><a href="/?id=${filelist[i]}">${filelist[i]}</a></li>`
+    }
+    list = list + '</ul>';
+    return list;
   }
-  list = list + '</ul>';
-  return list;
 }
 
 var app = http.createServer(function(request,response){  // localhost를 통해 동작시킬 app
@@ -40,20 +42,20 @@ var app = http.createServer(function(request,response){  // localhost를 통해 
         fs.readdir('./data', function(error, filelist) {
           var title = 'Welcome';
           var description = 'Hello, Node.js';
-          var list = templateList(filelist);
-          var template = templateHTML(title, list, 
+          var list = template.list(filelist);
+          var html = template.HTML(title, list, 
             `<h2>${title}</h2><p>${description}</p>`,
             `<a href="/create">create</a>`                         
           );
           response.writeHead(200);
-          response.end(template);
+          response.end(html);
         });
       } else {  // 목록 중 하나를 선택했을 때 활성화 되는 부분
         fs.readdir('./data', function(error, filelist) {
           fs.readFile(`data/${queryData.id}`, 'utf8', function(err, description) {
             var title = queryData.id;
-            var list = templateList(filelist);
-            var template = templateHTML(title, list, 
+            var list = template.list(filelist);
+            var html = template.HTML(title, list, 
               `<h2>${title}</h2><p>${description}</p>`
               `<a href="/create">create</a>
                <a href="/update?id=${title}">update</a>
@@ -63,16 +65,16 @@ var app = http.createServer(function(request,response){  // localhost를 통해 
                <form>`
             );
             response.writeHead(200);
-            response.end(template);
+            response.end(html);
           });
         });
       }
     } else if (pathname === '/create') {
       fs.readdir('./data', function(error, filelist) {
         var title = 'WEB - create';
-        var list = templateList(filelist);
-        var template = templateHTML(title, list, `
-          <form action="http://localhost:3000/process_create" method="post">
+        var list = template.list(filelist);
+        var html = template.HTML(title, list, 
+          `<form action="http://localhost:3000/process_create" method="post">
             <p><input type="text" name="title" placeholder="title"></p>
             <p>
               <textarea name="description" placeholder="description"></textarea>
@@ -80,10 +82,10 @@ var app = http.createServer(function(request,response){  // localhost를 통해 
             <p>
               <input type="submit">
             </p>
-          </form>
-        `, '');
+          </form>`, ''
+        );
         response.writeHead(200);
-        response.end(template);
+        response.end(html);
       });
     } else if (pathname === '/process_create') {  // /create에서 데이터를 넘겨주면서 바로 /process_create로 이동하게 된다.
       // body 정의 ~ request.on() 선언 : post방식으로 넘어온 데이터를 받는 로직
@@ -104,8 +106,8 @@ var app = http.createServer(function(request,response){  // localhost를 통해 
       fs.readdir('./data', function(error, filelist) {
         fs.readFile(`data/${queryData.id}`, 'utf8', function(err, description){
           var title = queryData.id;
-          var list = templateList(filelist);
-          var template = templateHTML(title, list,
+          var list = template.list(filelist);
+          var html = template.HTML(title, list,
             // <form>에서 입력받은 데이터들을 post방식으로 넘겨준다.
             `
             <form action="/process_update" method="post">
@@ -125,7 +127,7 @@ var app = http.createServer(function(request,response){  // localhost를 통해 
           // 두번쨰 <input> value : 기본값
           // textarea는 기본값을 value 속성이 아닌 태그 사이에 넣어서 설정
           response.writeHead(200);
-          response.end(template);
+          response.end(html);
         });
       });
     } else if (pathname === '/process_update') {  // /update에서 데어터를 넘겨주면서 바로 /process_update로 이동하게 된다.
