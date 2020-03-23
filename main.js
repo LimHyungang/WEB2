@@ -5,6 +5,16 @@ var qs = require('querystring');
 var template = require('./lib/template.js');
 var path = require('path');
 var sanitizeHtml = require('sanitize-html');  // html 태그 입출력 관련 보안 문제 해결하기 위한 모듈
+var mysql      = require('mysql');
+var db = mysql.createConnection({  // DB 연동
+  host     : 'localhost',
+  user     : 'root',
+  password : '2017125083',
+  database : 'web',
+  port : 3306
+});
+db.connect();
+
 
 var app = http.createServer(function(request,response){  // function : 서버로의 호출 있을 때 마다 실행될 콜백 메서드
     var _url = request.url;
@@ -13,10 +23,10 @@ var app = http.createServer(function(request,response){  // function : 서버로
 
     if (pathname === '/') {  // pathname이 root일 경우 (pathname : queryString제외한 path만 보여줌, path : queryString까지 모두 포함)
       if (queryData.id === undefined) {  // 기본 페이지
-        fs.readdir('./data', function(error, filelist) {
+        db.query(`select * from topic`, function(error, topics) {
           var title = 'Welcome';
           var description = 'Hello, Node.js';
-          var list = template.list(filelist);
+          var list = template.list(topics);
           var html = template.HTML(title, list, 
             `<h2>${title}</h2><p>${description}</p>`,
             `<a href="/create">create</a>`                         
@@ -25,23 +35,22 @@ var app = http.createServer(function(request,response){  // function : 서버로
           response.end(html);
         });
       } else {  // 목록 중 하나를 선택했을 때 활성화 되는 부분
-        fs.readdir('./data', function(error, filelist) {
-          var filteredId = path.parse(queryData.id).base;  // 보안 유지 위한 경로 필터링
-          fs.readFile(`data/${filteredId}`, 'utf8', function(err, description) {
-            var title = queryData.id;
-            var sanitizedTitle = sanitizeHtml(title);  // 외부에서(로) 출입하는 데이터들은 필터링을 거치는 것이 좋다
-            var sanitizedDescription = sanitizeHtml(description, {
-              allowedTags:['h1']  // <h1>를 제외한 모든 태그들은 전부 필터링
-            });
-            var list = template.list(filelist);
-            var html = template.HTML(sanitizedTitle, list, 
-              `<h2>${sanitizedTitle}</h2><p>${sanitizedDescription}</p>`,
-              `<a href="/create">create</a>
-               <a href="/update?id=${sanitizedTitle}">update</a>
+        db.query(`select * from topic`, function(error, topics) {
+          if (error) throw error;
+          // ${queryData.id}보다는 쿼리의 ?에 들어갈 값을 다음 매개변수에 배열 형태로 보내주는게 보안상 더 좋다.
+          db.query(`select * from topic where id=?`, [queryData.id], function(error2, topic) {
+            if (error2) throw error2;
+            var title = topic[0].title;  // 객체 형태의 튜플이 배열에 담겨서 들어오기 때문에 [0] 해줘야 함
+            var description = topic[0].description;
+            var list = template.list(topics);
+            var html = template.HTML(title, list, 
+             `<h2>${title}</h2><p>${description}</p>`,
+             `<a href="/create">create</a>
+               <a href="/update?id=${queryData.id}">update</a>
                <form action="/process_delete" method="post">
-                <input type="hidden" name="id" value="${sanitizedTitle}">
+                <input type="hidden" name="id" value="${queryData.id}">
                 <input type="submit" value="delete">
-               <form>`
+               <form>`                         
             );
             response.writeHead(200);
             response.end(html);
@@ -49,20 +58,22 @@ var app = http.createServer(function(request,response){  // function : 서버로
         });
       }
     } else if (pathname === '/create') {
-      fs.readdir('./data', function(error, filelist) {
-        var title = 'WEB - create';
-        var list = template.list(filelist);
+      db.query(`select * from topic`, function(error, topics) {
+        var title = 'Create';
+        var list = template.list(topics);
         var html = template.HTML(title, list, 
           `<form action="http://localhost:3000/process_create" method="post">
-            <p><input type="text" name="title" placeholder="title"></p>
-            <p>
-              <textarea name="description" placeholder="description"></textarea>
-            </p>
-            <p>
-              <input type="submit">
-            </p>
-          </form>`, ''
+          <p><input type="text" name="title" placeholder="title"></p>
+          <p>
+            <textarea name="description" placeholder="description"></textarea>
+          </p>
+          <p>
+            <input type="submit">
+          </p>
+        </form>`,
+          `<a href="/create">create</a>`                         
         );
+
         response.writeHead(200);
         response.end(html);
       });
@@ -74,34 +85,37 @@ var app = http.createServer(function(request,response){  // function : 서버로
       });
       request.on('end', function() {  // 더이상 들어올 데이터가 없을 때 실행되는 콜백 메서드.
         var post = qs.parse(body);
-        var title = post.title;  // 받아온 데이터 값을 가져올 수 있게 되었다.
-        var description = post.description;
-        fs.writeFile(`data/${title}`, description, 'utf8', function(err) {
-          response.writeHead(302, {Location : `/?id=${title}`});
-          response.end();  // writeHead() 받은 Location으로의 이동은 여기서 이뤄진다
-        });
+        db.query(`insert into topic (title, description, created, author_id) 
+                  values (?, ?, now(), ?)`, 
+                  [post.title, post.description, 1], 
+                  function(error, result) {
+                    if (error) throw error;
+                    response.writeHead(302, {Location : `/?id=${result.insertId}`});
+                    response.end();
+                  }
+        );
       });
     } else if (pathname === '/update') {
-      fs.readdir('./data', function(error, filelist) {
-        var filteredId = path.parse(queryData.id).base;  // 보안 유지 위한 경로 필터링
-        fs.readFile(`data/${filteredId}`, 'utf8', function(err, description){
-          var title = queryData.id;
-          var list = template.list(filelist);
-          var html = template.HTML(title, list,
+        db.query(`select * from topic`, function(error, topics) {
+        if (error) throw error;
+        db.query(`select * from topic where id=?`, [queryData.id], function(error2, topic) {
+          if (error2) throw error2;
+          var list = template.list(topics);
+          var html = template.HTML(topic[0].title, list,
             // <form>에서 입력받은 데이터들을 post방식으로 넘겨준다.
             `
             <form action="/process_update" method="post">
-              <input type="hidden" name="id" value="${title}">
-              <p><input type="text" name="title" placeholder="title" value="${title}"></p>
+              <input type="hidden" name="id" value="${topic[0].id}">
+              <p><input type="text" name="title" placeholder="title" value="${topic[0].title}"></p>
               <p>
-                <textarea name="description" placeholder="description">${description}</textarea>
+                <textarea name="description" placeholder="description">${topic[0].description}</textarea>
               </p>
               <p>
                 <input type="submit">
               </p>
             </form>
             `,
-            `<a href="/create">create</a> <a href="/update?id=${title}">update</a>`
+            `<a href="/create">create</a> <a href="/update?id=${topic[0].id}">update</a>`
           );
           // 첫번쨰 <input> : 수정할 대상 파일의 이름을 넘겨주기 위함
           // 두번쨰 <input> value : 기본값
@@ -118,17 +132,10 @@ var app = http.createServer(function(request,response){  // function : 서버로
       });
       request.on('end', function() {  // 더이상 들어올 데이터가 없을 때 실행되는 콜백 메서드.
         var post = qs.parse(body);
-        var id = post.id;
-        var title = post.title;  // 받아온 데이터 값을 가져올 수 있게 되었다.
-        var description = post.description;
-        fs.rename(`data/${id}`, `data/${title}`, function(error) {
-          // 콜백 : 파일 내용 수정
-          fs.writeFile(`data/${title}`, description, 'utf8', function(error) {
-            response.writeHead(302, {Location : `/?id=${title}`});  // id값까지 수정해줘야함
-            response.end();  // writeHead() 받은 Location으로의 이동은 여기서 이뤄진다
-          });
+        db.query(`update t  opic set title=?, description=?, author_id=1 where id=?`, [post.title, post.description, post.id], function(error, result) {
+          response.writeHead(302, {Location : `/?id=${post.id}`}); 
+          response.end(); 
         });
-
       });
     } else if (pathname === '/process_delete') {
       // body 정의 ~ request.on() 선언 : post방식으로 넘어온 데이터를 받는 로직
@@ -138,11 +145,10 @@ var app = http.createServer(function(request,response){  // function : 서버로
       });
       request.on('end', function() {  // 더이상 들어올 데이터가 없을 때 실행되는 콜백 메서드.
         var post = qs.parse(body);
-        var id = post.id;
-        var filteredId = path.parse(id).base;  // 보안 유지 위한 경로 필터링
-        fs.unlink(`data/${filteredId}`, function(error) {  // 입력받은 경로의 파일 삭제
-          response.writeHead(302, {Location : `/`});  // id값까지 수정해줘야함
-          response.end();  // writeHead() 받은 Location으로의 이동은 여기서 이뤄진다
+        db.query(`delete from topic where id =?`, [post.id], function(error, result) {
+          if (error) throw error;
+          response.writeHead(302, {Location : `/`});
+          response.end();
         });
       });
     } else {
