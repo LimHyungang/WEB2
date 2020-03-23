@@ -35,7 +35,7 @@ var app = http.createServer(function(request,response){  // function : 서버로
             });
             var list = template.list(filelist);
             var html = template.HTML(sanitizedTitle, list, 
-              `<h2>${sanitizedTitle}</h2><p>${sanitizedDescription}</p>`
+              `<h2>${sanitizedTitle}</h2><p>${sanitizedDescription}</p>`,
               `<a href="/create">create</a>
                <a href="/update?id=${sanitizedTitle}">update</a>
                <form action="/process_delete" method="post">
