@@ -1,6 +1,5 @@
 var http = require('http');
 var url = require('url');
-var db = require('./lib/db');
 var topic = require('./lib/topic');
 
 
