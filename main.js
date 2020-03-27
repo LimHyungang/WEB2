@@ -24,6 +24,16 @@ var app = http.createServer(function(request,response){  // function : 서버로
       topic.process_update(request, response);
     } else if (pathname === '/process_delete') {
       topic.process_delete(request, response);
+    } else if (pathname === '/author') {
+      author.home(request, response);
+    } else if (pathname === '/author/process_create') {
+      author.process_create(request, response);
+    } else if (pathname === '/author/update') {
+      author.update(request, response);
+    } else if (pathname === '/author/process_update') {
+      author.process_update(request, response);
+    } else if (pathname === '/author/process_delete') {
+      author.process_delete(request, response);
     } else {
       response.writeHead(404);
       response.end('Not found');
