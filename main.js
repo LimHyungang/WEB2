@@ -2,7 +2,6 @@ var http = require('http');
 var url = require('url');
 var topic = require('./lib/topic');
 
-
 var app = http.createServer(function(request,response){  // function : 서버로의 호출 있을 때 마다 실행될 콜백 메서드
     var _url = request.url;
     var queryData = url.parse(_url, true).query;  // queryString 정보
